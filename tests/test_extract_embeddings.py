@@ -19,6 +19,7 @@ class TestExtractEmbeddings(unittest.TestCase):
         self.args.layer = 'last'
         self.args.reduction = 'mean'
         self.args.experimenting = 'True'
+        self.args.model_path = None
 
     def tearDown(self):
         self.patcher_init_plm.stop()

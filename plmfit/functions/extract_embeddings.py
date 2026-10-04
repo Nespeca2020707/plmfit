@@ -3,6 +3,8 @@ from plmfit.shared_utils import utils
 from lightning import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
 from plmfit.models.lightning_model import LightningModel, PredictionWriter
+from plmfit.models.fine_tuners import LowRankAdaptationFineTuner
+from plmfit.shared_utils.checkpoint_utils import load_finetuned_backbone
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from plmfit.shared_utils.deepspeed_utils import (
     estimate_zero3_model_states_mem_needs_all_live,
@@ -20,6 +22,9 @@ def extract_embeddings(args, logger, data: Optional[pd.DataFrame] = None):
     model = utils.init_plm(args.plm, logger, task="extract_embeddings")
 
     model.experimenting = False
+
+    if args.model_path is not None:
+        model = load_finetuned_plm(model, args, logger)
 
     model.set_layer_to_use(args.layer)
     model.py_model.reduction = args.reduction
@@ -80,3 +85,31 @@ def extract_embeddings(args, logger, data: Optional[pd.DataFrame] = None):
     output = trainer.predict(model=model, dataloaders=data_loader)
 
     return output
+
+
+def load_finetuned_plm(model, args, logger):
+    """
+    Replace the pretrained weights of `model` with those of a PLM fine-tuned with PLMFit,
+    so that the embeddings are extracted from the fine-tuned model.
+
+    `args.model_path` is the checkpoint of the fine-tuning run; `args.ft_method`,
+    `args.target_layers` and `args.lora_config_path` must be the ones of that run.
+    """
+    if args.ft_method == "lora":
+        # Add LoRA to the model as in the fine-tuning run, load its weights and merge them
+        # into the weights of the backbone
+        fine_tuner = LowRankAdaptationFineTuner(
+            logger=logger, lora_config_path=args.lora_config_path
+        )
+        model = fine_tuner.prepare_model(model, target_layers=args.target_layers)
+        load_finetuned_backbone(model.py_model, args.model_path, logger)
+        model.py_model = model.py_model.merge_and_unload()
+    elif args.ft_method == "full":
+        load_finetuned_backbone(model.py_model, args.model_path, logger)
+    else:
+        raise ValueError(
+            "Embeddings can be extracted from a checkpoint (--model_path) of a model "
+            "fine-tuned with LoRA or with full fine-tuning: pass the method used as "
+            f"--ft_method ('lora' or 'full'), got '{args.ft_method}'."
+        )
+    return model

@@ -118,6 +118,14 @@ python3 plmfit --function extract_embeddings \
 - `--layer`: (Optional) Specifies the model layer from which to extract embeddings ('first', 'quarter1', 'middle', 'quarter3', 'last'—default, or a specific layer number).
 - `--reduction`: (Optional) Pooling method for embeddings ('mean'—default, 'bos', 'eos', 'sum', 'none'-requires substantial storage space).
 
+**Extracting embeddings from a fine-tuned model:**
+By default the embeddings are those of the pretrained PLM. To extract them from a PLM fine-tuned with PLMFit (see [Fine-Tuning models](#fine-tuning-models)), pass the checkpoint saved by the fine-tuning run and how it was obtained:
+- `--model_path`: Path of the checkpoint of the fine-tuning run (`<experiment_dir>/lightning_logs/best_model.ckpt`).
+- `--ft_method`: Fine-tuning method of that run, 'lora' or 'full' (bottleneck adapters are not supported).
+- `--target_layers`, `--lora_config_path`: The values used for fine-tuning, if different from the defaults.
+
+Only the backbone is taken from the checkpoint (with LoRA, the low-rank updates are merged into its weights), while the head is discarded. `--plm` must be the PLM that was fine-tuned, and the fine-tuning must have been run on the whole model (`--layer last`, the default); `--layer` and `--reduction` select, as usual, what to extract. A checkpoint that does not match the model stops the run with an error. To train a head on these embeddings with feature extraction, pass the path of the resulting .pt file with `--embeddings_path`.
+
 The output from the embedding extraction is a .pt file (PyTorch tensor) which contains the numerical representations of the sequences. Each sequence is transformed into an embedding vector, and the file size is determined by the number of sequences and the embedding size, essentially forming a matrix of size Sequences length X Embedding size. This structured data can then be used directly for machine learning models, providing a powerful toolset for predictive analytics and further research.
 
 **Why Extract embeddings?**
