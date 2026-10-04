@@ -148,6 +148,10 @@ python3 -u plmfit --function fine_tuning \
 - `--head_config`: JSON configuration file for the head, defining the task (regression, classification, domain adaptation). This JSON file needs to be located in `./config/training/` folder. The argument should be the relative path of the file to the `./config/training/` folder. For further documentation on how the head should be structured, refer to the [training management guide](./config/training/README.md).
 - `--embeddings_path`: Path to the previously generated embeddings.
 - `--ray_tuning`: Specifies if hyperparameter optimization is performed ('True' or 'False')
+- `--keep_checkpoint`: (Optional) Set to 'False' to delete the best checkpoint once the fine-tuned model has been tested, for instance to save disk space when running many experiments ('True'—default).
+- `--ckpt_staging_dir`: (Optional) Directory where the best checkpoint is written while training, before being moved to the experiment directory at the end of the run. Point it to a local disk when the experiment directory is on a slow network file system: no checkpoint is then written to the experiment directory during training. If a run is interrupted, its checkpoint is left in the staging directory.
+
+The checkpoint with the lowest validation loss is saved in the experiment directory as `lightning_logs/best_model.ckpt`, or as `best_model.ckpt` when training with DeepSpeed. Its path can be passed with `--model_path` to evaluate the model again (`--evaluate True`).
 
 **Understanding Fine-Tuning methods:**
 1. **Feature Extraction:**

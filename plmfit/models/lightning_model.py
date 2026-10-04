@@ -53,6 +53,8 @@ class LightningModel(L.LightningModule):
         self.plmfit_logger = plmfit_logger
         self.log_interval = log_interval
         self.method = method
+        # Directory of the best checkpoint; defaults to <experiment_dir>/lightning_logs
+        self.best_ckpt_dir = None
 
         if train:
             if "no_classes" not in self.hparams:
@@ -430,9 +432,7 @@ class LightningModel(L.LightningModule):
             or self.track_validation_after == -1
         ):
             self.best_val_loss = self.trainer.logged_metrics["val_loss_epoch"]
-            self.trainer.save_checkpoint(
-                f"{self.plmfit_logger.base_dir}/lightning_logs/best_model.ckpt"
-            )
+            self.trainer.save_checkpoint(self.best_checkpoint_path())
             self.best_epoch = self.current_epoch
             self.epochs_no_improve = 0
         else:
@@ -670,6 +670,10 @@ class LightningModel(L.LightningModule):
         return self.handle_bool_float_config_param(
             self.hparams.epoch_sizing, false_value=1.0, true_value=0.2
         )
+
+    def best_checkpoint_path(self):
+        ckpt_dir = self.best_ckpt_dir or f"{self.plmfit_logger.base_dir}/lightning_logs"
+        return f"{ckpt_dir}/best_model.ckpt"
 
     def merge_lists(self, lists):
         if dist.is_initialized():

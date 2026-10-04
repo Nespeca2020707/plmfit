@@ -18,7 +18,9 @@ from plmfit.shared_utils.deepspeed_utils import (
 from plmfit.models.lightning_model import LightningModel
 from lightning.pytorch.strategies import DeepSpeedStrategy
 import ast
+import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -130,9 +132,22 @@ def fine_tune(args, logger):
         strategy = "auto"
         devices = 1
 
+    # With --ckpt_staging_dir the best checkpoint is written to a folder of that directory
+    # reserved to this run (and moved to the experiment directory at the end), and the
+    # checkpoints that Lightning saves on its own, which are never read, are disabled:
+    # nothing is written to the experiment directory at every epoch.
+    staging_dir = None
+    if args.ckpt_staging_dir is not None and args.evaluate != "True":
+        os.makedirs(args.ckpt_staging_dir, exist_ok=True)
+        staging_dir = tempfile.mkdtemp(
+            prefix=f"{args.experiment_name}_", dir=args.ckpt_staging_dir
+        )
+        model.best_ckpt_dir = staging_dir
+
     trainer = Trainer(
         default_root_dir=logger.base_dir,
         logger=lightning_logger,
+        enable_checkpointing=staging_dir is None,
         max_epochs=model.hparams.epochs,
         enable_progress_bar=False,
         accumulate_grad_batches=model.gradient_accumulation_steps(),
@@ -155,10 +170,10 @@ def fine_tune(args, logger):
 
         # With DeepSpeed the best checkpoint is a ZeRO checkpoint (a directory) that has
         # to be converted; otherwise it is a regular checkpoint file, used as it is.
-        ckpt_path = f"{logger.base_dir}/lightning_logs/best_model.ckpt"
+        ckpt_path = model.best_checkpoint_path()
         if use_deepspeed():
             convert_zero_checkpoint_to_fp32_state_dict(
-                f"{logger.base_dir}/lightning_logs/best_model.ckpt",
+                ckpt_path,
                 f"{logger.base_dir}/best_model.ckpt",
             )
             ckpt_path = f"{logger.base_dir}/best_model.ckpt"
@@ -206,11 +221,31 @@ def fine_tune(args, logger):
         )
         logger.save_plot(fig, "confusion_matrix")
 
+    if args.evaluate != "True":
+        if args.keep_checkpoint == "False":
+            os.remove(ckpt_path)
+            logger.log("Best checkpoint deleted (--keep_checkpoint False)")
+        else:
+            if staging_dir is not None and not use_deepspeed():
+                # Move the staged checkpoint to its usual place in the experiment directory
+                staged_path = ckpt_path
+                ckpt_path = f"{logger.base_dir}/lightning_logs/best_model.ckpt"
+                os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+                shutil.move(staged_path, ckpt_path)
+            logger.log(f"Best checkpoint saved at {ckpt_path}")
+        if staging_dir is not None:
+            shutil.rmtree(staging_dir)
+
     if torch.cuda.is_available():
+        # Remove the checkpoints that are not needed anymore: the ZeRO checkpoint, already
+        # converted to a single file, and the ones saved by Lightning on its own
         if use_deepspeed():
-            # The ZeRO checkpoint has already been converted to a single file
-            shutil.rmtree(f"{logger.base_dir}/lightning_logs/best_model.ckpt")
-        shutil.rmtree(f"{logger.base_dir}/lightning_logs/version_0/checkpoints")
+            shutil.rmtree(
+                f"{logger.base_dir}/lightning_logs/best_model.ckpt", ignore_errors=True
+            )
+        shutil.rmtree(
+            f"{logger.base_dir}/lightning_logs/version_0/checkpoints", ignore_errors=True
+        )
 
 
 def downstream_prep(

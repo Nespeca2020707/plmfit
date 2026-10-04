@@ -42,6 +42,8 @@ def parse_args():
     parser.add_argument('--prediction_data', default=args.prediction_data, type=str)
     parser.add_argument('--batch_size', default=args.batch_size, type=int, help="Batch size mainly used for prediction")
     parser.add_argument('--lora_config_path', default=args.lora_config_path, type=str, help="LoRA configuration file, relative to the config folder")
+    parser.add_argument('--keep_checkpoint', default=args.keep_checkpoint, help="If 'False', the best checkpoint is deleted once the fine-tuned model has been tested")
+    parser.add_argument('--ckpt_staging_dir', default=args.ckpt_staging_dir, type=str, help="Directory where the best checkpoint is written while fine-tuning (e.g. on a local disk), before being moved to the experiment directory")
 
     return parser.parse_args()
 
@@ -81,3 +83,5 @@ class DefaultArgs:
     prediction_data: str = None
     batch_size: int = 100
     lora_config_path: str = "peft/lora_config.json"
+    keep_checkpoint: str = "True"
+    ckpt_staging_dir: str = None
