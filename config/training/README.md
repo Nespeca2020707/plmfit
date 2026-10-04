@@ -116,6 +116,8 @@ When setting up the `training_parameters` section in your configuration files,
 *   **epoch_sizing**: A float between 0.0 and 1.0 indicating the fraction of the total training data to be used in each epoch, or an integer for an absolute number of samples. Note that if you want the model to see 100% of the data, you must set it to 1.0 (including the .0 part); otherwise, it will only see 1 sample.
     
 *   **model_output**: Should stay as 'logits', except when doing feature extraction or training one-hot encoding models.
+
+*   **save_probabilities**: Optional, for token classification with more than one class. If true, the class probabilities of each token of the test set are saved in the metrics file (`pred_data.probs`, one list of probabilities per token, aligned with `pred_data.preds`), e.g. to choose a decision threshold afterwards. It is off by default because it makes the file considerably larger.
     
 #### Example complete configuration
 ```

@@ -500,10 +500,13 @@ class LightningModel(L.LightningModule):
             "test_loss", loss, on_step=True, on_epoch=True, logger=True, prog_bar=False
         )
 
+        probabilities = None
         if self.model.task == "classification" and self.hparams.no_classes > 1:
             labels = torch.argmax(labels, dim=1)
             # outputs = torch.argmax(outputs, dim=1)
         if self.model.task == "token_classification" and self.hparams.no_classes > 1:
+            if self.hparams.get("save_probabilities", False):
+                probabilities = token_class_probabilities(outputs)
             # Get the maximum value of the 3rd dimension
             outputs = torch.argmax(outputs, dim=1)
         if (
@@ -513,7 +516,7 @@ class LightningModel(L.LightningModule):
             # Logits loss function must be being used so we have to convert to probabilities
             outputs = torch.sigmoid(outputs)
             labels = labels.int()
-        self.metrics.add(outputs, labels, ids)
+        self.metrics.add(outputs, labels, ids, probabilities)
 
         if self.log_interval != -1 and batch_idx % self.log_interval == 0:
             self.plmfit_logger.log(
@@ -526,6 +529,7 @@ class LightningModel(L.LightningModule):
         self.metrics.preds_list = self.merge_lists(self.metrics.preds_list)
         self.metrics.actual_list = self.merge_lists(self.metrics.actual_list)
         self.metrics.ids = self.merge_lists(self.metrics.ids)
+        self.metrics.probs_list = self.merge_lists(self.metrics.probs_list)
         metrics = self.metrics.get_metrics(device=self.device)
         self.plmfit_logger.log(
             f'loss: {self.trainer.logged_metrics["test_loss_epoch"]:.4f} {time.time() - self.epoch_start_time:.4f}s'
@@ -703,6 +707,23 @@ class LightningModel(L.LightningModule):
         return lists
 
 
+def token_class_probabilities(outputs):
+    """
+    Class probabilities of each token, as a (batch, length, classes) tensor.
+
+    `outputs` are the (batch, classes, length) outputs of a token classification head:
+    logits, or probabilities already, when the head ends with a softmax activation.
+    """
+    outputs = outputs.float()
+    total = outputs.sum(dim=1)
+    are_probabilities = bool((outputs >= 0).all()) and torch.allclose(
+        total, torch.ones_like(total), atol=1e-2
+    )
+    if not are_probabilities:
+        outputs = torch.softmax(outputs, dim=1)
+    return outputs.permute(0, 2, 1)
+
+
 class Metrics(torch.nn.Module):
     def __init__(self, task: str, no_classes=1, no_labels=1):
         super().__init__()
@@ -710,6 +731,7 @@ class Metrics(torch.nn.Module):
         self.preds_list = []
         self.actual_list = []
         self.ids = []
+        self.probs_list = []  # class probabilities of each token, when requested
         if task == "classification":
             self.no_classes = no_classes
             if self.no_classes < 2:
@@ -757,13 +779,15 @@ class Metrics(torch.nn.Module):
                 num_labels=self.no_labels, ignore_index=-100
             )
 
-    def add(self, preds, actual, ids):
+    def add(self, preds, actual, ids, probs=None):
         if (
             self.task == "token_classification"
             or self.task == "multilabel_classification"
         ):
             self.preds_list.extend(preds.tolist())
             self.actual_list.extend(actual.tolist())
+            if probs is not None:
+                self.probs_list.extend(probs.tolist())
             (
                 self.ids.extend(ids.tolist())
                 if len(ids.tolist()) > 1
@@ -927,6 +951,8 @@ class Metrics(torch.nn.Module):
                 "ids": self.ids,
             },
         }
+        if self.probs_list:
+            self.report["pred_data"]["probs"] = self.probs_list
         return self.report
 
     def get_multilabel_classification_metrics(self):
@@ -966,6 +992,10 @@ class Metrics(torch.nn.Module):
                 existing_data["pred_data"]["ids"].extend(
                     self.report["pred_data"]["ids"]
                 )
+                if "probs" in existing_data["pred_data"] and "probs" in self.report["pred_data"]:
+                    existing_data["pred_data"]["probs"].extend(
+                        self.report["pred_data"]["probs"]
+                    )
                 self.report = existing_data
             else:
                 # If 'pred_data' does not exist, simply prepare to write the current report
