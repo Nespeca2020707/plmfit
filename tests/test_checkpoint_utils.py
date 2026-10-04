@@ -39,12 +39,15 @@ class TestLoadFinetunedBackbone(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
-    def save_checkpoint(self, py_model):
+    def save_checkpoint(self, py_model, settings=None):
         """Save a model as PLMFit does: a Lightning module holding the PLM as `model`."""
         state_dict = {f"model.{key}": value for key, value in py_model.state_dict().items()}
         state_dict["loss_function.weight"] = torch.ones(2)
+        checkpoint = {"state_dict": state_dict}
+        if settings is not None:
+            checkpoint["backbone_settings"] = settings
         path = os.path.join(self.tmp.name, "best_model.ckpt")
-        torch.save({"state_dict": state_dict}, path)
+        torch.save(checkpoint, path)
         return path
 
     def check_transfer(self, source, target, untouched):
@@ -143,6 +146,30 @@ class TestLoadFinetunedBackbone(unittest.TestCase):
             build_model(PlmfitEsmForTokenClassification, n_outputs=3, n_layers=2),
             r"not in the model \([1-9]",
         )
+
+    def test_settings_are_compared_with_those_of_the_checkpoint(self):
+        settings = {"plm": "tiny_esm", "ft_method": "lora", "r": 8, "lora_alpha": 16}
+        source = build_model(PlmfitEsmForTokenClassification, n_outputs=3, lora=True)
+        target = build_model(PlmfitEsmForTokenClassification, n_outputs=3, lora=True)
+        ckpt = self.save_checkpoint(source, settings)
+        load_finetuned_backbone(target, ckpt, settings=dict(settings))
+        # The LoRA scaling factor does not change the weights: only the settings reveal it
+        with self.assertRaisesRegex(
+            RuntimeError, "lora_alpha is 16 in the checkpoint and 32 in this run"
+        ):
+            load_finetuned_backbone(target, ckpt, settings={**settings, "lora_alpha": 32})
+
+    def test_checkpoint_without_settings(self):
+        # Checkpoints saved before the settings were recorded can still be used
+        source = build_model(PlmfitEsmForTokenClassification, n_outputs=3, lora=True)
+        target = build_model(PlmfitEsmForTokenClassification, n_outputs=3, lora=True)
+        logger = MagicMock()
+        load_finetuned_backbone(
+            target, self.save_checkpoint(source), logger, settings={"lora_alpha": 16}
+        )
+        messages = [call.args[0] for call in logger.log.call_args_list]
+        self.assertIn("does not record the settings", messages[0])
+        self.assertTrue(messages[-1].startswith("Loaded"))
 
     def test_checkpoint_directory(self):
         target = build_model(PlmfitEsmForTokenClassification, n_outputs=3)

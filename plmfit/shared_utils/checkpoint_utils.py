@@ -27,50 +27,63 @@ def _preview(keys, limit=5):
     return ", ".join(keys[:limit]) + (", ..." if len(keys) > limit else "")
 
 
-def load_model_state_dict(ckpt_path):
-    """
-    Read the weights of the fine-tuned PLM from a PLMFit checkpoint.
+def _check_settings(saved, current, ckpt_path, logger):
+    """Compare the settings recorded in a checkpoint with those of the current run."""
+    if saved is None:
+        if logger is not None:
+            logger.log(
+                f"{ckpt_path} does not record the settings of the run that saved it: "
+                f"make sure they were the same as in this run ({current})"
+            )
+        return
+    differences = [
+        f"{name} is {saved.get(name)!r} in the checkpoint and {value!r} in this run"
+        for name, value in current.items()
+        if saved.get(name) != value
+    ]
+    if differences:
+        raise RuntimeError(
+            f"The checkpoint {ckpt_path} was saved by a run with different settings: "
+            f"{'; '.join(differences)}.\n{MISMATCH_HINT}"
+        )
 
-    The checkpoint is the file saved in the experiment directory by a fine-tuning run. The
-    weights are returned with the names they have in the PyTorch model, i.e. without the
-    prefix of the Lightning module that wraps it.
+
+def load_finetuned_backbone(py_model, ckpt_path, logger=None, settings=None):
+    """
+    Initialize `py_model` with the fine-tuned backbone stored in a checkpoint.
+
+    The checkpoint is the file saved in the experiment directory by a fine-tuning run.
+    Every weight it contains is loaded except those of the prediction head: `py_model`
+    gets the fine-tuned backbone, with its LoRA or bottleneck adapters if any, and keeps
+    its own head.
+
+    The backbone of `py_model` must be the same as the one that was saved: same PLM and
+    layers, fine-tuning method, target layers and adapter configuration. A RuntimeError is
+    raised, so that a run never continues from weights other than the ones requested, if
+    - a weight of the backbone is missing from the checkpoint, has no counterpart in
+      `py_model` or has a different shape;
+    - one of the `settings` of the current run (a dictionary) differs from the value
+      recorded in the checkpoint by the run that saved it. This catches what the weights
+      cannot reveal, such as a different LoRA scaling factor.
+
+    Returns the names of the weights of `py_model` that are not in the checkpoint and are
+    therefore left as they were (the head, and the pooler if the saved model had none).
     """
     if os.path.isdir(ckpt_path):
         raise ValueError(
             f"{ckpt_path} is a directory, while a checkpoint file is expected, such as "
             "the 'best_model.ckpt' saved in the experiment directory of a fine-tuning run."
         )
-    state_dict = torch.load(ckpt_path, map_location="cpu")["state_dict"]
+    checkpoint = torch.load(ckpt_path, map_location="cpu")
+    if settings is not None:
+        _check_settings(checkpoint.get("backbone_settings"), settings, ckpt_path, logger)
+
+    # The weights of the PLM are those of the `model` attribute of the Lightning module
     prefix = "model."
-    return {
-        key[len(prefix) :]: value
-        for key, value in state_dict.items()
-        if key.startswith(prefix)
-    }
-
-
-def load_finetuned_backbone(py_model, ckpt_path, logger=None):
-    """
-    Initialize `py_model` with the fine-tuned backbone stored in a checkpoint.
-
-    Every weight of the checkpoint is loaded except those of the prediction head: `py_model`
-    gets the fine-tuned backbone, with its LoRA or bottleneck adapters if any, and keeps its
-    own head.
-
-    The backbone of `py_model` must be the same as the one that was saved: same PLM and
-    layers, fine-tuning method, target layers and adapter configuration. If a weight of the
-    backbone is missing from the checkpoint, has no counterpart in `py_model` or has a
-    different shape, a RuntimeError is raised, so that a run never continues from weights
-    other than the ones requested.
-
-    Returns the names of the weights of `py_model` that are not in the checkpoint and are
-    therefore left as they were (the head, and the pooler if the saved model had none).
-    """
-    state_dict = load_model_state_dict(ckpt_path)
     backbone = {
-        key: value
-        for key, value in state_dict.items()
-        if not _in_modules(key, HEAD_MODULES)
+        key[len(prefix) :]: value
+        for key, value in checkpoint["state_dict"].items()
+        if key.startswith(prefix) and not _in_modules(key, HEAD_MODULES)
     }
 
     try:

@@ -213,7 +213,7 @@ python3 -u plmfit --function fine_tuning \
 
 The second run takes from the checkpoint the weights of the PLM and of its LoRA or bottleneck adapters, and keeps training them. The rest is new: the head is initialized as usual, since the two tasks are in general different, and training starts from the first epoch with a new optimizer (the first run is not resumed).
 
-The two runs must use the same `--plm`, `--layer`, `--ft_method` and `--target_layers`, and the same LoRA or adapter configuration: if the weights expected by the model and those in the checkpoint differ, the run stops with an error instead of falling back to the pretrained weights. The LoRA scaling factor (`lora_alpha`) is not a weight and cannot be checked this way, so make sure it is the same in the two runs, for instance by giving both the same `--lora_config_path`.
+The two runs must use the same `--plm`, `--layer`, `--ft_method` and `--target_layers`, and the same LoRA or adapter configuration: if the weights expected by the model and those in the checkpoint differ, the run stops with an error instead of falling back to the pretrained weights. The settings that the weights alone do not reveal, such as the LoRA scaling factor (`lora_alpha`), are recorded in the checkpoint and compared as well.
 
 ### Train One-Hot Encoding models
 

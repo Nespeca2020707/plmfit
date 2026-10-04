@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -47,6 +48,7 @@ class TestLoadFinetunedPlm(unittest.TestCase):
         state_dict = {f"model.{key}": value for key, value in source.state_dict().items()}
         torch.save({"state_dict": state_dict}, path)
         args = types.SimpleNamespace(
+            plm="tiny_esm",
             model_path=path,
             ft_method=ft_method,
             target_layers="all",
@@ -178,6 +180,25 @@ class TestExtractFinetunedEmbeddings(PlmfitRunTestCase):
         self.assertTrue(torch.allclose(fine_tuned, reference, atol=1e-4))
         # Fine-tuning did change the embeddings: those of the pretrained model are different
         self.assertGreater((pretrained - reference).abs().max(), 0.1)
+
+    def test_another_lora_scaling_is_rejected(self):
+        # Merging the LoRA weights with another scaling factor would give other embeddings
+        with open(f"{self.workdir}/config/peft/lora_config.json") as f:
+            alpha = json.load(f)["lora_alpha"]
+        experiment_dir = self.run_plmfit(
+            "other_scaling",
+            function="extract_embeddings",
+            data_type=THREE_CLASSES,
+            model_path=self.ckpt,
+            ft_method="lora",
+            lora_config_path=self.write_lora_config("other_scaling", lora_alpha=2 * alpha),
+            expect_failure=True,
+        )
+        self.assertIn(
+            f"lora_alpha is {alpha} in the checkpoint and {2 * alpha} in this run",
+            self.read_log(experiment_dir),
+        )
+        self.assertFalse(os.path.exists(f"{experiment_dir}/other_scaling.pt"))
 
     def test_fine_tuning_method_is_required(self):
         experiment_dir = self.run_plmfit(

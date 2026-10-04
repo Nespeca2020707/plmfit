@@ -16,6 +16,7 @@ class TestFineTune(unittest.TestCase):
         self.args.lora_config_path = 'peft/lora_config.json'
         self.args.ckpt_staging_dir = None
         self.args.model_path = None
+        self.args.target_layers = 'all'
 
     def run_fine_tune_tests(self, ft_method, heads_to_test):
         with tempfile.TemporaryDirectory() as temp_dir:

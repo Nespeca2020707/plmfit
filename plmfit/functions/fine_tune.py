@@ -97,9 +97,19 @@ def fine_tune(args, logger):
     # Sequential fine-tuning: start from the backbone of a model fine-tuned on another task
     # rather than from the pretrained one. Only the weights are reused: the head is new and
     # training starts from the first epoch with a new optimizer.
+    # What defines the fine-tuned backbone besides its weights: it is recorded in the
+    # checkpoints and checked whenever the backbone of a checkpoint is reused
+    backbone_settings = {
+        "plm": args.plm,
+        "layer": model.layer_to_use,
+        "ft_method": args.ft_method,
+        **fine_tuner.settings,
+    }
     if args.model_path is not None and args.evaluate != "True":
         logger.log(f"Initializing the backbone from {args.model_path}")
-        load_finetuned_backbone(model.py_model, args.model_path, logger)
+        load_finetuned_backbone(
+            model.py_model, args.model_path, logger, backbone_settings
+        )
 
     utils.trainable_parameters_summary(model, logger)
     model.py_model.task = task
@@ -111,6 +121,7 @@ def fine_tune(args, logger):
         log_interval=100,
         experimenting=model.experimenting,
     )
+    model.backbone_settings = backbone_settings
     lightning_logger = TensorBoardLogger(
         save_dir=logger.base_dir, version=0, name="lightning_logs"
     )

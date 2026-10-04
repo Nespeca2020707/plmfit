@@ -110,6 +110,15 @@ class PlmfitRunTestCase(unittest.TestCase):
         return f"{name}.json"
 
     @classmethod
+    def write_lora_config(cls, name, **changes):
+        """Write a variant of the default LoRA configuration and return its path (relative to the config folder)."""
+        with open(f"{cls.workdir}/config/peft/lora_config.json") as f:
+            lora_config = {**json.load(f), **changes}
+        with open(f"{cls.workdir}/config/peft/{name}.json", "w") as f:
+            json.dump(lora_config, f)
+        return f"peft/{name}.json"
+
+    @classmethod
     def run_plmfit(cls, experiment_name, expect_failure=False, **arguments):
         """
         Run `python -m plmfit` with the given arguments and return the experiment directory.

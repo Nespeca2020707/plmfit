@@ -60,6 +60,8 @@ class LightningModel(L.LightningModule):
         self.method = method
         # Directory of the best checkpoint; defaults to <experiment_dir>/lightning_logs
         self.best_ckpt_dir = None
+        # Settings that define the fine-tuned backbone, recorded in the checkpoints
+        self.backbone_settings = None
 
         if train:
             if "no_classes" not in self.hparams:
@@ -694,6 +696,10 @@ class LightningModel(L.LightningModule):
         return self.handle_bool_float_config_param(
             self.hparams.epoch_sizing, false_value=1.0, true_value=0.2
         )
+
+    def on_save_checkpoint(self, checkpoint):
+        if self.backbone_settings is not None:
+            checkpoint["backbone_settings"] = self.backbone_settings
 
     def best_checkpoint_path(self):
         ckpt_dir = self.best_ckpt_dir or f"{self.plmfit_logger.base_dir}/lightning_logs"

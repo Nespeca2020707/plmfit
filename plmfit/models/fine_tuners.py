@@ -17,6 +17,8 @@ import plmfit.shared_utils.utils as utils
 class FineTuner(ABC):
     def __init__(self, logger = None):
         self.logger = logger
+        # Settings of the method that, with the weights, define the fine-tuned backbone
+        self.settings = {}
 
     def set_trainable_parameters(self, model):
         pass
@@ -61,6 +63,7 @@ class LowRankAdaptationFineTuner(FineTuner):
         super().__init__(logger)
         peft_config = utils.load_config(lora_config_path)
         self.logger.save_data(peft_config, 'lora_config')
+        self.settings = {key: peft_config[key] for key in ('r', 'lora_alpha')}
             
         self.peft_config = LoraConfig(
             r = peft_config['r'],
@@ -77,6 +80,7 @@ class LowRankAdaptationFineTuner(FineTuner):
             layers_to_train = None # Which will equal to all
         utils.disable_dropout(model.py_model)
         self.peft_config.layers_to_transform = layers_to_train
+        self.settings['target_layers'] = target_layers
         model.py_model = get_peft_model(model.py_model, self.peft_config)
         model.py_model.print_trainable_parameters()
 
@@ -88,6 +92,9 @@ class BottleneckAdaptersFineTuner(FineTuner):
         super().__init__(logger)
         peft_config = utils.load_config('peft/bottleneck_adapters_config.json')
         self.logger.save_data(peft_config, "bottleneck_adapters_config")
+        self.settings = {
+            key: peft_config[key] for key in ('bottleneck_size', 'non_linearity', 'scaling')
+        }
 
         self.peft_config = BottleneckConfig(
             bottleneck_size = peft_config['bottleneck_size'],
@@ -103,6 +110,7 @@ class BottleneckAdaptersFineTuner(FineTuner):
         else:
             layers_to_train = None # Which will equal to all
         self.peft_config.layers_to_transform = layers_to_train
+        self.settings['target_layers'] = target_layers
         utils.disable_dropout(model.py_model)
         model.py_model = get_peft_model(model.py_model, self.peft_config)
         model.py_model.print_trainable_parameters()

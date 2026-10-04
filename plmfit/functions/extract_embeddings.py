@@ -95,6 +95,7 @@ def load_finetuned_plm(model, args, logger):
     `args.model_path` is the checkpoint of the fine-tuning run; `args.ft_method`,
     `args.target_layers` and `args.lora_config_path` must be the ones of that run.
     """
+    settings = {"plm": args.plm, "ft_method": args.ft_method}
     if args.ft_method == "lora":
         # Add LoRA to the model as in the fine-tuning run, load its weights and merge them
         # into the weights of the backbone
@@ -102,10 +103,11 @@ def load_finetuned_plm(model, args, logger):
             logger=logger, lora_config_path=args.lora_config_path
         )
         model = fine_tuner.prepare_model(model, target_layers=args.target_layers)
-        load_finetuned_backbone(model.py_model, args.model_path, logger)
+        settings.update(fine_tuner.settings)
+        load_finetuned_backbone(model.py_model, args.model_path, logger, settings)
         model.py_model = model.py_model.merge_and_unload()
     elif args.ft_method == "full":
-        load_finetuned_backbone(model.py_model, args.model_path, logger)
+        load_finetuned_backbone(model.py_model, args.model_path, logger, settings)
     else:
         raise ValueError(
             "Embeddings can be extracted from a checkpoint (--model_path) of a model "
