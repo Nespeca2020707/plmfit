@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--weights', default=args.weights)
     parser.add_argument('--sampler', default=args.sampler)
     parser.add_argument('--split_size', default=args.split_size, type=int)
-    parser.add_argument('--model_path', default=args.model_path, help="Path of the model in .ckpt format for evaluating it or continuing training from checkpoint")
+    parser.add_argument('--model_path', default=args.model_path, help="Path of the checkpoint (.ckpt) of a fine-tuned model: the model to evaluate or to predict with or, when fine-tuning, the model whose backbone is the starting point")
     parser.add_argument('--model_metadata', default=args.model_metadata, help="Path of the model metadata to load the model")
     parser.add_argument('--evaluate', default=args.evaluate)
     parser.add_argument('--seed', default=args.seed, type=int)

@@ -175,6 +175,38 @@ The checkpoint with the lowest validation loss is saved in the experiment direct
 **Advanced usage:**
 You can change the configuration of LoRA and Bottleneck Adapters by adapting the relevant config file found in `./config/peft/` folder. Change these parameters only if you have experience with these methods or want to experiment with different settings. To keep several LoRA configurations side by side instead of editing the default file, pass `--lora_config_path` with the path of the file to use, relative to the config folder (default: `peft/lora_config.json`).
 
+**Sequential fine-tuning:**
+A model can be fine-tuned starting from the backbone of a model that was fine-tuned on another task, instead of the pretrained PLM. Pass the checkpoint saved by the first run with `--model_path`:
+
+```bash
+# 1. Fine-tune on the first task
+python3 -u plmfit --function fine_tuning \
+                  --ft_method lora \
+                  --head_config <head_configuration_of_first_task> \
+                  --data_type <first_dataset> \
+                  --split <dataset_split> \
+                  --plm <model_name> \
+                  --output_dir <output_directory> \
+                  --experiment_dir <first_experiment_directory> \
+                  --experiment_name <first_experiment>
+
+# 2. Fine-tune on the second task, starting from the model fine-tuned on the first
+python3 -u plmfit --function fine_tuning \
+                  --ft_method lora \
+                  --head_config <head_configuration_of_second_task> \
+                  --data_type <second_dataset> \
+                  --split <dataset_split> \
+                  --plm <model_name> \
+                  --model_path <first_experiment_directory>/lightning_logs/best_model.ckpt \
+                  --output_dir <output_directory> \
+                  --experiment_dir <second_experiment_directory> \
+                  --experiment_name <second_experiment>
+```
+
+The second run takes from the checkpoint the weights of the PLM and of its LoRA or bottleneck adapters, and keeps training them. The rest is new: the head is initialized as usual, since the two tasks are in general different, and training starts from the first epoch with a new optimizer (the first run is not resumed).
+
+The two runs must use the same `--plm`, `--layer`, `--ft_method` and `--target_layers`, and the same LoRA or adapter configuration: if the weights expected by the model and those in the checkpoint differ, the run stops with an error instead of falling back to the pretrained weights. The LoRA scaling factor (`lora_alpha`) is not a weight and cannot be checked this way, so make sure it is the same in the two runs, for instance by giving both the same `--lora_config_path`.
+
 ### Train One-Hot Encoding models
 
 To train models using one-hot encoding, utilize:

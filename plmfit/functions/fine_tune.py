@@ -15,6 +15,7 @@ from plmfit.shared_utils.deepspeed_utils import (
     estimate_zero3_model_states_mem_needs_all_live,
     use_deepspeed,
 )
+from plmfit.shared_utils.checkpoint_utils import load_finetuned_backbone
 from plmfit.models.lightning_model import LightningModel
 from lightning.pytorch.strategies import DeepSpeedStrategy
 import ast
@@ -92,6 +93,13 @@ def fine_tune(args, logger):
         raise ValueError("Fine-tuning method not supported")
 
     model = fine_tuner.prepare_model(model, target_layers=args.target_layers)
+
+    # Sequential fine-tuning: start from the backbone of a model fine-tuned on another task
+    # rather than from the pretrained one. Only the weights are reused: the head is new and
+    # training starts from the first epoch with a new optimizer.
+    if args.model_path is not None and args.evaluate != "True":
+        logger.log(f"Initializing the backbone from {args.model_path}")
+        load_finetuned_backbone(model.py_model, args.model_path, logger)
 
     utils.trainable_parameters_summary(model, logger)
     model.py_model.task = task
