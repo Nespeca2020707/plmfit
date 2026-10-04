@@ -88,6 +88,10 @@ When setting up the `training_parameters` section in your configuration files,
     *   'mse' (Mean Squared Error)
         
     *   'cross_entropy' (Cross-Entropy)
+
+    *   'masked_weighted_ce' (Cross-Entropy with class weights, for token classification). Set **class_weights** to the list of the weights of the classes, e.g. `[1.0, 30.0]` to make the errors on a rare second class count 30 times more.
+
+    *   'masked_focal_softmax' (Focal loss, for token classification). Optional parameters: **gamma**, the focusing exponent (2.0 by default), and **alpha**, the weighting of the classes (none by default). **alpha** is either the list of the weights of the classes, or a number between 0 and 1 that gives weight alpha to class 1 and 1 - alpha to the other classes; mind that a number below 0.5 gives class 1 *less* weight than the others.
         
 *   **optimizer**: The optimizer to use. It can be either 'adam' or 'sgd'.
 
