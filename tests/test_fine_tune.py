@@ -13,6 +13,7 @@ class TestFineTune(unittest.TestCase):
         self.args.reduction = 'mean'
         self.args.experimenting = 'True'
         self.args.split = None
+        self.args.lora_config_path = 'peft/lora_config.json'
 
     def run_fine_tune_tests(self, ft_method, heads_to_test):
         with tempfile.TemporaryDirectory() as temp_dir:

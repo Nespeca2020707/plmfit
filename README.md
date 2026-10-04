@@ -169,7 +169,7 @@ python3 -u plmfit --function fine_tuning \
    - Cons: May require careful tuning of the bottleneck architecture to achieve desired improvements.
 
 **Advanced usage:**
-You can change the configuration of LoRA and Bottleneck Adapters by adapting the relevant config file found in `./config/peft/` folder. Change these parameters only if you have experience with these methods or want to experiment with different settings.
+You can change the configuration of LoRA and Bottleneck Adapters by adapting the relevant config file found in `./config/peft/` folder. Change these parameters only if you have experience with these methods or want to experiment with different settings. To keep several LoRA configurations side by side instead of editing the default file, pass `--lora_config_path` with the path of the file to use, relative to the config folder (default: `peft/lora_config.json`).
 
 ### Train One-Hot Encoding models
 

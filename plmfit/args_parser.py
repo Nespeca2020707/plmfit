@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--hyperparam_config', default=args.hyperparam_config, type=str)
     parser.add_argument('--prediction_data', default=args.prediction_data, type=str)
     parser.add_argument('--batch_size', default=args.batch_size, type=int, help="Batch size mainly used for prediction")
+    parser.add_argument('--lora_config_path', default=args.lora_config_path, type=str, help="LoRA configuration file, relative to the config folder")
 
     return parser.parse_args()
 
@@ -79,3 +80,4 @@ class DefaultArgs:
     hyperparam_config: str = "hyperparam_config.json"
     prediction_data: str = None
     batch_size: int = 100
+    lora_config_path: str = "peft/lora_config.json"

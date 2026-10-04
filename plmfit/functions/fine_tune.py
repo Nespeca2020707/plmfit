@@ -75,7 +75,8 @@ def fine_tune(args, logger):
 
     if args.ft_method == "lora":
         fine_tuner = LowRankAdaptationFineTuner(
-            logger=logger
+            logger=logger,
+            lora_config_path=args.lora_config_path,
         )
     elif args.ft_method == "bottleneck_adapters":
         fine_tuner = BottleneckAdaptersFineTuner(

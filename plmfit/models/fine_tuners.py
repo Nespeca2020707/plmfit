@@ -57,9 +57,9 @@ class FullRetrainFineTuner(FineTuner):
         return model
 
 class LowRankAdaptationFineTuner(FineTuner):
-    def __init__(self, logger = None):
+    def __init__(self, logger = None, lora_config_path = 'peft/lora_config.json'):
         super().__init__(logger)
-        peft_config = utils.load_config('peft/lora_config.json')
+        peft_config = utils.load_config(lora_config_path)
         self.logger.save_data(peft_config, 'lora_config')
             
         self.peft_config = LoraConfig(
