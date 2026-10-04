@@ -6,6 +6,7 @@ PLMFit is a powerful framework designed to democratize the fine-tuning of Protei
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Additions of this fork](#additions-of-this-fork)
 - [Scoreboard](#scoreboard)
 - [Contributions](#contributions)
 - [Citations](#citations)
@@ -264,6 +265,19 @@ Use tabs as deliminators and the last line has to stay blank, otherwise the scri
 ### Upcoming features
 
 - **Predict or generate from existing models**: Coming soon.
+
+## Additions of this fork
+
+This repository is a fork of [PLMFit](https://github.com/LSSI-ETH/plmfit). It adds what is needed to transfer what a PLM has learned on a task to another task:
+
+- **Sequential fine-tuning**: a PLM can be fine-tuned starting from a model that was fine-tuned on another task, by passing its checkpoint with `--model_path` (see [Fine-Tuning models](#fine-tuning-models)).
+- **Embeddings of fine-tuned models**: embeddings can be extracted from a PLM fine-tuned with LoRA or with full fine-tuning, for instance to train a head on them with feature extraction (see [Extracting embeddings](#extracting-embeddings)).
+- **Checked reuse of checkpoints**: checkpoints record the settings that define the fine-tuned backbone, and a checkpoint whose weights or settings do not match the model is rejected with an error instead of being loaded in part.
+- **Checkpoint options**: `--keep_checkpoint`, `--ckpt_staging_dir` and `--lora_config_path` (see [Fine-Tuning models](#fine-tuning-models)).
+- **Token classification**: two losses for unbalanced classes (`masked_weighted_ce`, `masked_focal_softmax`) and, on request, the class probabilities of each token in the test report (`save_probabilities`), described in the [training management guide](./config/training/README.md).
+- **Optional DeepSpeed**: without DeepSpeed, PLMFit runs on a single device (see [Installation](#installation)).
+
+These additions have been tested with ESM-2, on LoRA and full fine-tuning. The tests are run from the root of the repository with `python -m unittest discover -s tests`; those that fine-tune a model use `esm2_t6_8M_UR50D` and run on a CPU in about a minute.
 
 ## Scoreboard
 Here we present the current best performing setups for each task. These benchmarks are indicative since they are a result of a comparative study and we encourage the community to find better setups with different hyperparameters for each task. 
