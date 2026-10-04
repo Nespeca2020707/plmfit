@@ -145,17 +145,13 @@ python3 -u plmfit --function fine_tuning \
                   --plm <model_name> \
                   --output_dir <output_directory> \
                   --experiment_dir <experiment_directory> \
-                  --experiment_name <name_of_experiment> \
-                  --embeddings_path <embeddings_path_including_filename> \
-                  --ray_tuning <bool>
+                  --experiment_name <name_of_experiment>
 ```
 
 **Fine-Tuning methods:**
-- `--ft_method`: Specifies the fine-tuning method ('feature_extraction', 'full', 'lora', 'bottleneck_adapters').
-- `--target_layers`: Targets specific layers ('all' or 'last'), not applicable for 'feature_extraction'.
+- `--ft_method`: Specifies the fine-tuning method ('full', 'lora', 'bottleneck_adapters'). Feature extraction is not one of them: it is run with a function of its own, see [Feature extraction](#feature-extraction).
+- `--target_layers`: Targets specific layers ('all' or 'last').
 - `--head_config`: JSON configuration file for the head, defining the task (regression, classification, domain adaptation). This JSON file needs to be located in `./config/training/` folder. The argument should be the relative path of the file to the `./config/training/` folder. For further documentation on how the head should be structured, refer to the [training management guide](./config/training/README.md).
-- `--embeddings_path`: Path to the previously generated embeddings.
-- `--ray_tuning`: Specifies if hyperparameter optimization is performed ('True' or 'False')
 - `--keep_checkpoint`: (Optional) Set to 'False' to delete the best checkpoint once the fine-tuned model has been tested, for instance to save disk space when running many experiments ('True'—default).
 - `--ckpt_staging_dir`: (Optional) Directory where the best checkpoint is written while training, before being moved to the experiment directory at the end of the run. Point it to a local disk when the experiment directory is on a slow network file system: no checkpoint is then written to the experiment directory during training. If a run is interrupted, its checkpoint is left in the staging directory.
 
@@ -165,6 +161,7 @@ The checkpoint with the lowest validation loss is saved in the experiment direct
 1. **Feature Extraction:**
    - Description: This method involves extracting embeddings with a pre-trained model before fine-tuning a new head on these embeddings. It is less computationally intensive as it does not require updating the weights of the pre-trained model. To automatically use embeddings extracted beforehand, use the same `output_dir` argument.
    - Prerequisite: Embedding extraction must be completed first, as it uses these embeddings as input. The argument `embeddings_path` needs to be passed pointing to the full path -including .pt file name- to embeddings.
+   - Usage: It is run with `--function feature_extraction`, see [Feature extraction](#feature-extraction).
    - Pros: Efficient in terms of computation; reduces the risk of overfitting on small datasets.
    - Cons: May not capture as complex patterns as methods that update deeper model layers.
 2. **Full Fine-Tuning:**
@@ -214,6 +211,29 @@ python3 -u plmfit --function fine_tuning \
 The second run takes from the checkpoint the weights of the PLM and of its LoRA or bottleneck adapters, and keeps training them. The rest is new: the head is initialized as usual, since the two tasks are in general different, and training starts from the first epoch with a new optimizer (the first run is not resumed).
 
 The two runs must use the same `--plm`, `--layer`, `--ft_method` and `--target_layers`, and the same LoRA or adapter configuration: if the weights expected by the model and those in the checkpoint differ, the run stops with an error instead of falling back to the pretrained weights. The settings that the weights alone do not reveal, such as the LoRA scaling factor (`lora_alpha`), are recorded in the checkpoint and compared as well.
+
+### Feature extraction
+
+Feature extraction trains a head on embeddings extracted beforehand, without updating the PLM. It has its own function (`--function fine_tuning --ft_method feature_extraction` is not supported):
+
+```bash
+python3 -u plmfit --function feature_extraction \
+                  --head_config <head_configuration_file> \
+                  --data_type <dataset_short_name> \
+                  --split <dataset_split> \
+                  --plm <model_name> \
+                  --layer <layer_option> \
+                  --reduction <reduction_method> \
+                  --embeddings_path <embeddings_path_including_filename> \
+                  --output_dir <output_directory> \
+                  --experiment_dir <experiment_directory> \
+                  --experiment_name <name_of_experiment> \
+                  --ray_tuning <bool>
+```
+
+- `--embeddings_path`: Full path, including the file name, of the .pt file with the embeddings (see [Extracting embeddings](#extracting-embeddings)).
+- `--layer`, `--reduction`: The layer and the pooling method the embeddings were extracted with.
+- `--ray_tuning`: Specifies if hyperparameter optimization is performed ('True' or 'False').
 
 ### Train One-Hot Encoding models
 

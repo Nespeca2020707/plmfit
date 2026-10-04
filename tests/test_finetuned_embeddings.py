@@ -172,6 +172,14 @@ class TestExtractFinetunedEmbeddings(PlmfitRunTestCase):
         with torch.no_grad():
             return plm.py_model.eval()(tokens).hidden_states[-1].mean(dim=1)
 
+    def test_without_checkpoint_embeddings_are_those_of_the_pretrained_model(self):
+        plm = utils.init_plm(PLM, None, task="extract_embeddings")
+        tokens = plm.categorical_encode(utils.load_dataset(THREE_CLASSES))
+        with torch.no_grad():
+            reference = plm.py_model.eval()(tokens).hidden_states[-1].mean(dim=1)
+        pretrained = self.extract("pretrained_only_embs")
+        self.assertTrue(torch.allclose(pretrained, reference, atol=1e-4))
+
     def test_embeddings_are_those_of_the_fine_tuned_model(self):
         fine_tuned = self.extract("fine_tuned_embs", model_path=self.ckpt, ft_method="lora")
         pretrained = self.extract("pretrained_embs")

@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 import plmfit.functions.fine_tune as fine_tune
 import tempfile
 
+@unittest.skip("The dataset 'testing-aav' these tests run on is not in the repository")
 class TestFineTune(unittest.TestCase):
     def setUp(self):
         self.mock_logger = MagicMock()

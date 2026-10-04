@@ -31,7 +31,7 @@ class TestPLMFitMainInvocation(unittest.TestCase):
 
     def test_run_feature_extraction(self):
         test_args = [
-            'plmfit', '--function=fine_tuning', '--ft_method=feature_extraction', '--experiment_dir=/fake/dir',
+            'plmfit', '--function=feature_extraction', '--experiment_dir=/fake/dir',
             '--logger=local'
         ]
         with patch('sys.argv', test_args), patch('plmfit.__main__.run_feature_extraction') as mock_run:
