@@ -4,7 +4,10 @@ from lightning import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
 from plmfit.models.lightning_model import LightningModel, PredictionWriter
 from lightning.pytorch.strategies import DeepSpeedStrategy
-from deepspeed.runtime.zero.stage3 import estimate_zero3_model_states_mem_needs_all_live
+from plmfit.shared_utils.deepspeed_utils import (
+    estimate_zero3_model_states_mem_needs_all_live,
+    use_deepspeed,
+)
 from lightning.pytorch.tuner import Tuner
 from typing import Optional
 import pandas as pd
@@ -40,15 +43,18 @@ def extract_embeddings(args, logger, data: Optional[pd.DataFrame] = None):
         save_dir=logger.base_dir, version=0, name="lightning_logs"
     )
 
-    strategy = DeepSpeedStrategy(
-        stage=3,
-        offload_optimizer=True,
-        offload_parameters=True,
-        load_full_weights=True,
-    )
-
-    devices = args.gpus if torch.cuda.is_available() else 1
-    strategy = strategy if torch.cuda.is_available() else "auto"
+    if use_deepspeed():
+        strategy = DeepSpeedStrategy(
+            stage=3,
+            offload_optimizer=True,
+            offload_parameters=True,
+            load_full_weights=True,
+        )
+        devices = args.gpus
+    else:
+        # On CPU, or on GPU without DeepSpeed, run on a single device
+        strategy = "auto"
+        devices = 1
 
     pred_writer = PredictionWriter(logger=logger, write_interval="epoch", split_size=args.split_size)
 
@@ -66,7 +72,7 @@ def extract_embeddings(args, logger, data: Optional[pd.DataFrame] = None):
     # # Auto-scale batch size by growing it exponentially (default)
     # tuner.scale_batch_size(model, mode="power")
 
-    if torch.cuda.is_available():
+    if use_deepspeed():
         estimate_zero3_model_states_mem_needs_all_live(
             model, num_gpus_per_node=int(args.gpus), num_nodes=1
         )

@@ -3,10 +3,9 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 import torch
 import time
 import json
-from deepspeed.ops.adam import DeepSpeedCPUAdam
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from plmfit.shared_utils import utils
-from deepspeed.profiling.flops_profiler.profiler import FlopsProfiler
+from plmfit.shared_utils.deepspeed_utils import DeepSpeedCPUAdam, FlopsProfiler
 import os
 import torch.distributed as dist
 from torchmetrics.classification import (

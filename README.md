@@ -55,6 +55,8 @@ Before you start, make sure Python 3.11 is installed on your system. Higher vers
    pip install -e .
    ```
 
+   DeepSpeed is only needed to train on GPUs with the DeepSpeed ZeRO strategy. If it cannot be installed on your machine (building it requires the CUDA toolkit), remove the `deepspeed` line from `requirements.txt` before installing: PLMFit then runs on a single device with the default Lightning strategy.
+
 ### Configuration
 
 Configure the `.env` file in the root directory as follows:

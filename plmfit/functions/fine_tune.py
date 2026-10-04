@@ -11,7 +11,10 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities.deepspeed import (
     convert_zero_checkpoint_to_fp32_state_dict,
 )
-from deepspeed.runtime.zero.stage3 import estimate_zero3_model_states_mem_needs_all_live
+from plmfit.shared_utils.deepspeed_utils import (
+    estimate_zero3_model_states_mem_needs_all_live,
+    use_deepspeed,
+)
 from plmfit.models.lightning_model import LightningModel
 from lightning.pytorch.strategies import DeepSpeedStrategy
 import ast
@@ -109,18 +112,22 @@ def fine_tune(args, logger):
     if args.data_type == "herH3" and args.split == "one_vs_rest":
         model.track_validation_after = -1
 
-    strategy = DeepSpeedStrategy(
-        stage=3,
-        offload_optimizer=True,
-        offload_parameters=True,
-        load_full_weights=True,
-        initial_scale_power=20,
-        loss_scale_window=2000,
-        min_loss_scale=0.25,
-        contiguous_gradients=True,
-    )
-    devices = args.gpus if torch.cuda.is_available() else 1
-    strategy = strategy if torch.cuda.is_available() else "auto"
+    if use_deepspeed():
+        strategy = DeepSpeedStrategy(
+            stage=3,
+            offload_optimizer=True,
+            offload_parameters=True,
+            load_full_weights=True,
+            initial_scale_power=20,
+            loss_scale_window=2000,
+            min_loss_scale=0.25,
+            contiguous_gradients=True,
+        )
+        devices = args.gpus
+    else:
+        # On CPU, or on GPU without DeepSpeed, train on a single device
+        strategy = "auto"
+        devices = 1
 
     trainer = Trainer(
         default_root_dir=logger.base_dir,
@@ -136,7 +143,7 @@ def fine_tune(args, logger):
         precision="16-mixed" if torch.cuda.is_available() else 32,
         callbacks=[model.early_stopping()],
     )
-    if torch.cuda.is_available():
+    if use_deepspeed():
         estimate_zero3_model_states_mem_needs_all_live(
             model, num_gpus_per_node=int(args.gpus), num_nodes=1
         )
@@ -145,14 +152,17 @@ def fine_tune(args, logger):
         model.train()
         trainer.fit(model, data_loaders["train"], data_loaders["val"])
 
+        # With DeepSpeed the best checkpoint is a ZeRO checkpoint (a directory) that has
+        # to be converted; otherwise it is a regular checkpoint file, used as it is.
         ckpt_path = f"{logger.base_dir}/lightning_logs/best_model.ckpt"
-        if torch.cuda.is_available():
+        if use_deepspeed():
             convert_zero_checkpoint_to_fp32_state_dict(
                 f"{logger.base_dir}/lightning_logs/best_model.ckpt",
                 f"{logger.base_dir}/best_model.ckpt",
             )
             ckpt_path = f"{logger.base_dir}/best_model.ckpt"
 
+        if torch.cuda.is_available():
             loss_plot = data_explore.create_loss_plot(
                 json_path=f"{logger.base_dir}/{logger.experiment_name}_loss.json"
             )
@@ -160,7 +170,7 @@ def fine_tune(args, logger):
     else:
         ckpt_path = args.model_path
         # If ckpt_path is a zero checkpoint (check if it is a folder), convert it to fp32
-        if Path(ckpt_path).is_dir() and torch.cuda.is_available():
+        if Path(ckpt_path).is_dir() and use_deepspeed():
             convert_zero_checkpoint_to_fp32_state_dict(
                 ckpt_path,
                 f"{logger.base_dir}/best_model.ckpt",
@@ -196,7 +206,9 @@ def fine_tune(args, logger):
         logger.save_plot(fig, "confusion_matrix")
 
     if torch.cuda.is_available():
-        shutil.rmtree(f"{logger.base_dir}/lightning_logs/best_model.ckpt")
+        if use_deepspeed():
+            # The ZeRO checkpoint has already been converted to a single file
+            shutil.rmtree(f"{logger.base_dir}/lightning_logs/best_model.ckpt")
         shutil.rmtree(f"{logger.base_dir}/lightning_logs/version_0/checkpoints")
 
 

@@ -11,6 +11,7 @@ from packaging import version
 from optuna.visualization import plot_optimization_history, plot_slice
 from plmfit.shared_utils import utils, data_explore
 from plmfit.logger import LogOptunaTrialCallback
+from plmfit.shared_utils.deepspeed_utils import use_deepspeed
 
 
 ###--- TODO: Code is outdated and needs to be updated to the latest version of plmfit ---###
@@ -177,17 +178,21 @@ def objective(
     if args.data_type == "herH3" and args.split == "one_vs_rest":
         model.track_validation_after = -1
 
-    strategy = DeepSpeedStrategy(
-        stage=3,
-        offload_optimizer=True,
-        offload_parameters=True,
-        load_full_weights=True,
-        initial_scale_power=20,
-        loss_scale_window=2000,
-        min_loss_scale=0.25,
-    )
-    devices = args.gpus if torch.cuda.is_available() else 1
-    strategy = strategy if torch.cuda.is_available() else "auto"
+    if use_deepspeed():
+        strategy = DeepSpeedStrategy(
+            stage=3,
+            offload_optimizer=True,
+            offload_parameters=True,
+            load_full_weights=True,
+            initial_scale_power=20,
+            loss_scale_window=2000,
+            min_loss_scale=0.25,
+        )
+        devices = args.gpus
+    else:
+        # On CPU, or on GPU without DeepSpeed, train on a single device
+        strategy = "auto"
+        devices = 1
 
     callbacks = []
     if on_ray_tuning:

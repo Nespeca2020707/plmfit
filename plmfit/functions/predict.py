@@ -11,6 +11,7 @@ from plmfit.models.fine_tuners import (
     BottleneckAdaptersFineTuner,
 )
 import plmfit.models.downstream_heads as heads
+from plmfit.shared_utils.deepspeed_utils import use_deepspeed
 
 def predict(args, logger):
 
@@ -76,12 +77,15 @@ def predict(args, logger):
             "task"
         ]
 
-        strategy = DeepSpeedStrategy(
-            stage=3,
-            offload_optimizer=True,
-            offload_parameters=True,
-            load_full_weights=True,
-        )
+        if use_deepspeed():
+            strategy = DeepSpeedStrategy(
+                stage=3,
+                offload_optimizer=True,
+                offload_parameters=True,
+                load_full_weights=True,
+            )
+        else:
+            strategy = "auto"
 
         # Encode input data
         encoded_input_data = model.categorical_encode(input_data)
