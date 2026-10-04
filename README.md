@@ -22,7 +22,7 @@ Before you start, make sure Python 3.11 is installed on your system. Higher vers
 1. **Clone the repository:**
    Access the PLMFit repository and clone it to your machine:
    ```bash
-   git clone https://github.com/LSSI-ETH/plmfit.git
+   git clone https://github.com/Nespeca2020707/plmfit.git
    ```
 
 2. **Navigate to the project directory:**
